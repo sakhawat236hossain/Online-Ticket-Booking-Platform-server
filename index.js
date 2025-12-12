@@ -85,7 +85,25 @@ async function run() {
  
    
 
-   
+    // accepted api for vendor
+    app.patch("/accept-booking/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const updateDoc = {
+        $set: {
+          status: "accepted",
+        },
+      };
+
+      const filter = { _id: new ObjectId(id) };
+      const result = await ticketsBookingCollection.updateOne(
+        filter,
+        updateDoc
+      );
+
+      res.send(result);
+    });
+
     // =================== USER BOOKING APIS ========================
     // GET All Bookings email by a User
     app.get("/user-tickets", async (req, res) => {
