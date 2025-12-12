@@ -67,7 +67,21 @@ async function run() {
 
 
 
- 
+    // make vendor
+    app.patch("/makeVendor/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const updateDoc = {
+        $set: {
+          role: "vendor",
+        },
+      };
+
+      const filter = { _id: new ObjectId(id) };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+
+      res.send(result);
+    });
 
 
     // make admin
