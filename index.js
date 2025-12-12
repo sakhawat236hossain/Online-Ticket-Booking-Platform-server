@@ -185,6 +185,30 @@ async function run() {
       res.send(result);
     });
 
+// advertise
+    app.patch("/ticketsAdvertise/:id", async (req, res) => {
+  const id = req.params.id;
+  const { advertised } = req.body;
+
+  const result = await ticketsCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: { advertised } }
+  );
+
+  res.send(result);
+});
+
+    //  get only advertisement tickets (Exactly 6)
+app.get("/ticketsAdvertised", async (req, res) => {
+  const result = await ticketsCollection
+    .find({ advertised: true })
+    .limit(6)
+    .toArray();
+
+  res.send(result);
+});
+
+
     // ====================TICKETS APIS=========================
     //  POST Ticket
     app.post("/tickets", async (req, res) => {
@@ -218,13 +242,8 @@ async function run() {
       res.send(approvedTickets);
     });
 
-    //  get only advertisement tickets (Exactly 6)
-    app.get("/advertisement-tickets", async (req, res) => {
-      const query = { status: "approved" };
-      const cursor = ticketsCollection.find(query).limit(8);
-      const result = await cursor.toArray();
-      res.send(result);
-    });
+
+    
 
     // get Single Ticket by ID
     app.get("/tickets/:id", async (req, res) => {
