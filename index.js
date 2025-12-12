@@ -72,7 +72,22 @@ async function run() {
 
 
 
- 
+    // make admin
+    app.patch("/makeFraud/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const updateDoc = {
+        $set: {
+          role: "fraud",
+        },
+      };
+
+      const filter = { _id: new ObjectId(id) };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+
+      res.send(result);
+    });
+
     // ====================TICKETS APIS=========================
     //  POST Ticket
     app.post("/tickets", async (req, res) => {
