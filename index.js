@@ -81,6 +81,20 @@ async function run() {
    
  
 
+    // GET All Tickets Added by a Vendor
+    app.get("/vendor-tickets", async (req, res) => {
+      const email = req.query.email;
+
+      if (!email) {
+        return res.status(400).send({ message: "Email is required" });
+      }
+
+      const query = { "Vendor.VendorEmail": email };
+
+      const result = await ticketsCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // update vendor ticket
     app.patch("/tickets/:id", async (req, res) => {
       const id = req.params.id;
