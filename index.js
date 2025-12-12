@@ -56,7 +56,15 @@ async function run() {
     const ticketsBookingCollection = db.collection("ticketsBooking");
     const usersCollection = db.collection("users");
 
+    // ====================USERS APIS=========================
+ 
 
+    // GET All Users
+    app.get("/users", async (req, res) => {
+      const cursor = usersCollection.find();
+      const users = await cursor.toArray();
+      res.send(users);
+    });
 
     // ====================================================ADMIN APIS============================================================
     // ROLE UPDATE TO ADMIN
