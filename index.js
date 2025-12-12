@@ -78,7 +78,26 @@ async function run() {
  
  
  
-   
+    // get Single Ticket by ID
+    app.get("/tickets/:id", async (req, res) => {
+      const id = req.params.id;
+      const { ObjectId } = require("mongodb");
+
+      try {
+        const query = { _id: new ObjectId(id) };
+        const ticket = await ticketsCollection.findOne(query);
+
+        if (!ticket) {
+          return res.status(404).send({ message: "Ticket not found" });
+        }
+
+        res.send(ticket);
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({ message: "Server Error" });
+      }
+    });
+
     // ====================TICKETS APIS VENDOR=========================
 
     // POST Ticket Booking
