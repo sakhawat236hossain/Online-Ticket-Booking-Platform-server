@@ -77,7 +77,14 @@ async function run() {
   
  
  
- 
+    //  get only advertisement tickets (Exactly 6)
+    app.get("/advertisement-tickets", async (req, res) => {
+      const query = { status: "approved" };
+      const cursor = ticketsCollection.find(query).limit(8);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     // get Single Ticket by ID
     app.get("/tickets/:id", async (req, res) => {
       const id = req.params.id;
