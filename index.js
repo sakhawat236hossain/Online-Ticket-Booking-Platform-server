@@ -51,7 +51,11 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     await client.connect();
-  
+    const db = client.db("Online_Ticket_Booking_Platform-DB");
+    const ticketsCollection = db.collection("tickets");
+    const ticketsBookingCollection = db.collection("ticketsBooking");
+    const usersCollection = db.collection("users");
+
 
 
  
