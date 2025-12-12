@@ -64,6 +64,22 @@ async function run() {
 
    
 
+    //  reject ticket
+    app.patch("/reject/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const updateDoc = {
+        $set: {
+          status: "reject",
+        },
+      };
+
+      const filter = { _id: new ObjectId(id) };
+      const result = await ticketsCollection.updateOne(filter, updateDoc);
+
+      res.send(result);
+    });
+
 
 
 
