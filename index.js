@@ -60,7 +60,13 @@ async function run() {
 
  
 
- 
+  // delete vendor ticket
+    app.delete("/ticketsAdmin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await ticketsCollection.deleteOne(filter);
+      res.send(result);
+    });
 
     // approve ticket
     app.patch("/approve/:id", async (req, res) => {
