@@ -79,7 +79,24 @@ async function run() {
  
  
    
- 
+    // ====================TICKETS APIS VENDOR=========================
+
+    // POST Ticket Booking
+    app.post("/tickets-booking", async (req, res) => {
+      try {
+        const bookingData = req.body;
+        const bookingResult = await ticketsBookingCollection.insertOne(
+          bookingData
+        );
+        res.send({
+          success: true,
+          bookingResult,
+        });
+      } catch (err) {
+        console.log(err);
+        res.status(500).send({ message: "Internal Server Error", error: err });
+      }
+    });
 
     // GET All Tickets Added by a Vendor
     app.get("/vendor-tickets", async (req, res) => {
