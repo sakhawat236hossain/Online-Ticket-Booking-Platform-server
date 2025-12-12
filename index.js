@@ -82,7 +82,14 @@ async function run() {
  
 
  
-   
+    // delete vendor ticket
+    app.delete("/tickets/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const result = await ticketsCollection.deleteOne(filter);
+      res.send(result);
+    });
+
     // REQUESTED TO USER FOR VENDOR TICKET
 
     app.get("/requested-tickets", async (req, res) => {
