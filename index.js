@@ -75,7 +75,14 @@ async function run() {
  
 
   
- 
+    // latest tickets
+    app.get("/latest-tickets", async (req, res) => {
+      const query = { status: "approved" };
+      const cursor = ticketsCollection.find(query).sort({ _id: -1 }).limit(8);
+      const tickets = await cursor.toArray();
+      res.send(tickets);
+    });
+
     // get Only Approved Tickets All
     app.get("/approved-tickets", async (req, res) => {
       const query = { status: "approved" };
