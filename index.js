@@ -62,7 +62,22 @@ async function run() {
 
  
 
-   
+    // approve ticket
+    app.patch("/approve/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const updateDoc = {
+        $set: {
+          status: "approved",
+        },
+      };
+
+      const filter = { _id: new ObjectId(id) };
+      const result = await ticketsCollection.updateOne(filter, updateDoc);
+
+      res.send(result);
+    });
+
 
     //  reject ticket
     app.patch("/reject/:id", async (req, res) => {
