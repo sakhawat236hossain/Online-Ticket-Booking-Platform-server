@@ -81,7 +81,39 @@ async function run() {
    
  
 
- 
+    // update vendor ticket
+    app.patch("/tickets/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedData = req.body;
+      const updateDoc = {
+        $set: {
+          ...updatedData,
+        },
+      };
+      const filter = { _id: new ObjectId(id) };
+      try {
+        const result = await ticketsCollection.updateOne(filter, updateDoc);
+        if (result.matchedCount === 0) {
+          return res.status(404).send({
+            success: false,
+            message: "Ticket not found or ID is incorrect.",
+          });
+        }
+        res.send({
+          success: true,
+          message: "Ticket updated successfully and status is pending.",
+          result,
+        });
+      } catch (error) {
+        console.error("Error updating ticket:", error);
+        res.status(500).send({
+          success: false,
+          message: "Failed to update ticket.",
+          error: error.message,
+        });
+      }
+    });
+
     // delete vendor ticket
     app.delete("/tickets/:id", async (req, res) => {
       const id = req.params.id;
