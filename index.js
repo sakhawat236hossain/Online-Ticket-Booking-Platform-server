@@ -73,8 +73,23 @@ async function run() {
 
 
  
+    // ====================TICKETS APIS=========================
+    //  POST Ticket
+    app.post("/tickets", async (req, res) => {
+      console.log("headers in the post",req.headers);
+      const ticketData = req.body;
+      const result = await ticketsCollection.insertOne(ticketData);
+      res.send(result);
+    });
 
-  
+    // //  GET All Tickets just for testing purpose no use in production
+
+    // app.get('/tickets', async (req, res) => {
+    //   const cursor = ticketsCollection.find()
+    //   const tickets = await cursor.toArray();
+    //   res.send(tickets);
+    // });
+
     // latest tickets
     app.get("/latest-tickets", async (req, res) => {
       const query = { status: "approved" };
