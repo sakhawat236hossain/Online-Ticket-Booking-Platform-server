@@ -83,7 +83,24 @@ async function run() {
 
  
  
-   
+    // rejected api for vendor
+    app.patch("/reject-booking/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const updateDoc = {
+        $set: {
+          status: "rejected",
+        },
+      };
+
+      const filter = { _id: new ObjectId(id) };
+      const result = await ticketsBookingCollection.updateOne(
+        filter,
+        updateDoc
+      );
+
+      res.send(result);
+    });
 
     // accepted api for vendor
     app.patch("/accept-booking/:id", async (req, res) => {
