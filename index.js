@@ -58,7 +58,16 @@ async function run() {
 
 
 
- 
+    // ====================================================ADMIN APIS============================================================
+    // ROLE UPDATE TO ADMIN
+
+
+      // get all tickets for admin
+    app.get("/ticketsAdmin", async (req, res) => {
+      const cursor = ticketsCollection.find().sort({ _id: -1 });
+      const approvedTickets = await cursor.toArray();
+      res.send(approvedTickets);
+    });
 
   // delete vendor ticket
     app.delete("/ticketsAdmin/:id", async (req, res) => {
