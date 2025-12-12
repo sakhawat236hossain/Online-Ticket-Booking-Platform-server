@@ -70,6 +70,21 @@ async function run() {
  
 
 
+    // make admin
+    app.patch("/makeAdmin/:id", async (req, res) => {
+      const id = req.params.id;
+
+      const updateDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+
+      const filter = { _id: new ObjectId(id) };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+
+      res.send(result);
+    });
 
 
     // make admin
