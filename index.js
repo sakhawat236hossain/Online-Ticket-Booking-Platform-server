@@ -57,7 +57,21 @@ async function run() {
     const usersCollection = db.collection("users");
 
     // ====================USERS APIS=========================
- 
+    // POST User
+    app.post("/users", async (req, res) => {
+      const userData = req.body;
+      userData.role = "user";
+      userData.createdAt = new Date();
+      const email = userData.email;
+      const existingUser = await usersCollection.findOne({ email: email });
+      if (existingUser) {
+        return res
+          .status(409)
+          .send({ message: "User with this email already exists." });
+      }
+      const result = await usersCollection.insertOne(userData);
+      res.send(result);
+    });
 
     // GET All Users
     app.get("/users", async (req, res) => {
