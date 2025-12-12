@@ -82,7 +82,19 @@ async function run() {
  
 
  
- 
+   
+    // REQUESTED TO USER FOR VENDOR TICKET
+
+    app.get("/requested-tickets", async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        return res.status(400).send({ message: "Email is required" });
+      }
+      const query = { "vendor.VendorEmail": email };
+      const result = await ticketsBookingCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // rejected api for vendor
     app.patch("/reject-booking/:id", async (req, res) => {
       const id = req.params.id;
