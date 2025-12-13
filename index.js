@@ -78,8 +78,26 @@ async function run() {
       res.send(users);
     });
 
-    // gat all transactionId for user
-    app.get("/transactionId", async (req, res) => {});
+   // get all transactions by buyer email
+app.get("/transactions", async (req, res) => {
+  try {
+    const email = req.query.email;
+
+    if (!email) {
+      return res.status(400).send({ message: "Email is required" });
+    }
+
+    const transactions = await transactionCollection.find({ buyerEmail: email })
+      .sort({ paymentDate: -1 }) 
+      .toArray();
+
+    res.send(transactions);
+  } catch (error) {
+    console.error("Get Transactions Error:", error);
+    res.status(500).send({ message: "Internal Server Error" });
+  }
+});
+
 
     // ====================================================ADMIN APIS============================================================
     // ROLE UPDATE TO ADMIN
