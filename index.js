@@ -3,10 +3,10 @@ const cors = require("cors");
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const port = process.env.PORT || 8000;
 const admin = require("firebase-admin");
-
 
 // middleware
 app.use(express.json());
@@ -14,9 +14,10 @@ app.use(cors());
 
 const serviceAccount = require("./online-ticket-booking-platform-firebase-adminsdk.json");
 
-// firebase token 
+// firebase token
 const verifyFBToken = async (req, res, next) => {
   const token = req.headers.authorization;
+  console.log(token);
 
   if (!token) {
     return res.status(401).send({ message: "unauthorized access" });
@@ -43,10 +44,6 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
-
-
-
-
 
 async function run() {
   try {
@@ -83,15 +80,14 @@ async function run() {
     // ====================================================ADMIN APIS============================================================
     // ROLE UPDATE TO ADMIN
 
-
-      // get all tickets for admin
+    // get all tickets for admin
     app.get("/ticketsAdmin", async (req, res) => {
       const cursor = ticketsCollection.find().sort({ _id: -1 });
       const approvedTickets = await cursor.toArray();
       res.send(approvedTickets);
     });
 
-  // delete vendor ticket
+    // delete vendor ticket
     app.delete("/ticketsAdmin/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -115,7 +111,6 @@ async function run() {
       res.send(result);
     });
 
-
     //  reject ticket
     app.patch("/reject/:id", async (req, res) => {
       const id = req.params.id;
@@ -131,9 +126,6 @@ async function run() {
 
       res.send(result);
     });
-
-
-
 
     // make vendor
     app.patch("/makeVendor/:id", async (req, res) => {
@@ -151,7 +143,6 @@ async function run() {
       res.send(result);
     });
 
-
     // make admin
     app.patch("/makeAdmin/:id", async (req, res) => {
       const id = req.params.id;
@@ -167,7 +158,6 @@ async function run() {
 
       res.send(result);
     });
-
 
     // make admin
     app.patch("/makeFraud/:id", async (req, res) => {
@@ -185,34 +175,50 @@ async function run() {
       res.send(result);
     });
 
-// advertise
+    // advertise
     app.patch("/ticketsAdvertise/:id", async (req, res) => {
-  const id = req.params.id;
-  const { advertised } = req.body;
+      const id = req.params.id;
+      const { advertised } = req.body;
 
-  const result = await ticketsCollection.updateOne(
-    { _id: new ObjectId(id) },
-    { $set: { advertised } }
-  );
+      try {
+        if (advertised) {
+          const advertisedCount = await ticketsCollection.countDocuments({
+            advertised: true,
+          });
 
-  res.send(result);
-});
+          if (advertisedCount >= 6) {
+            return res.status(400).send({
+              message: "Maximum 6 tickets can be advertised at a time",
+            });
+          }
+        }
+
+        const result = await ticketsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { advertised } }
+        );
+
+        res.send(result);
+      } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Something went wrong" });
+      }
+    });
 
     //  get only advertisement tickets (Exactly 6)
-app.get("/ticketsAdvertised", async (req, res) => {
-  const result = await ticketsCollection
-    .find({ advertised: true })
-    .limit(6)
-    .toArray();
+    app.get("/ticketsAdvertised", async (req, res) => {
+      const result = await ticketsCollection
+        .find({ advertised: true })
+        .limit(6)
+        .toArray();
 
-  res.send(result);
-});
-
+      res.send(result);
+    });
 
     // ====================TICKETS APIS=========================
     //  POST Ticket
     app.post("/tickets", async (req, res) => {
-      console.log("headers in the post",req.headers);
+      console.log("headers in the post", req.headers);
       const ticketData = req.body;
       const result = await ticketsCollection.insertOne(ticketData);
       res.send(result);
@@ -241,9 +247,6 @@ app.get("/ticketsAdvertised", async (req, res) => {
       const approvedTickets = await cursor.toArray();
       res.send(approvedTickets);
     });
-
-
-    
 
     // get Single Ticket by ID
     app.get("/tickets/:id", async (req, res) => {
@@ -283,6 +286,58 @@ app.get("/ticketsAdvertised", async (req, res) => {
         res.status(500).send({ message: "Internal Server Error", error: err });
       }
     });
+
+    // ========================payment related=========================
+
+    app.post("/create-checkout-session", async (req, res) => {
+      try {
+        const paymentInfo = req.body;
+        console.log("Payment Info:", paymentInfo);
+
+      const session = await stripe.checkout.sessions.create({
+  // payment_method_types: ["card"],
+
+  customer_email: paymentInfo?.buyer?.buyerEmail,
+
+  line_items: [
+    {
+      price_data: {
+        currency: "usd",
+        product_data: {
+          name: paymentInfo?.title,
+          images: [paymentInfo?.image],
+        },
+        unit_amount: paymentInfo?.price * 100,
+      },
+      quantity: paymentInfo?.quantity,
+    },
+  ],
+
+  mode: "payment",
+
+  metadata: {
+    ticketId: paymentInfo?.ticketId,
+    buyerEmail: paymentInfo?.buyer?.buyerEmail,
+    buyerImage: paymentInfo?.buyer?.buyerPhoto,
+  },
+
+  success_url: `${process.env.CLIENT_LOCALHOST_DOMAINE}/paymentSuccess?session_id={CHECKOUT_SESSION_ID}`,
+  cancel_url: `${process.env.CLIENT_LOCALHOST_DOMAINE}/dashboard/myBookingTickets`,
+});
+
+
+        res.send({ url: session.url });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: error.message });
+      }
+    });
+
+
+
+
+
+
 
     // GET All Tickets Added by a Vendor
     app.get("/vendor-tickets", async (req, res) => {
@@ -339,16 +394,23 @@ app.get("/ticketsAdvertised", async (req, res) => {
       res.send(result);
     });
 
-    // REQUESTED TO USER FOR VENDOR TICKET
-
+    // GET requested tickets for a vendor
     app.get("/requested-tickets", async (req, res) => {
-      const email = req.query.email;
-      if (!email) {
-        return res.status(400).send({ message: "Email is required" });
+      try {
+        const email = req.query.email;
+        if (!email) {
+          return res.status(400).send({ message: "Email is required" });
+        }
+
+        const bookings = await ticketsBookingCollection
+          .find({ "vendor.VendorEmail": email })
+          .toArray();
+
+        res.send(bookings);
+      } catch (error) {
+        console.error("Error fetching requested tickets:", error);
+        res.status(500).send({ message: "Internal Server Error" });
       }
-      const query = { "vendor.VendorEmail": email };
-      const result = await ticketsBookingCollection.find(query).toArray();
-      res.send(result);
     });
 
     // rejected api for vendor
