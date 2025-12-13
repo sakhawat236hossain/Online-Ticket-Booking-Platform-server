@@ -52,6 +52,7 @@ async function run() {
     const ticketsCollection = db.collection("tickets");
     const ticketsBookingCollection = db.collection("ticketsBooking");
     const usersCollection = db.collection("users");
+    const transactionCollection = db.collection("transactionData");
 
     // ====================USERS APIS=========================
     // POST User
@@ -76,6 +77,9 @@ async function run() {
       const users = await cursor.toArray();
       res.send(users);
     });
+
+    // gat all transactionId for user
+    app.get("/transactionId", async (req, res) => {});
 
     // ====================================================ADMIN APIS============================================================
     // ROLE UPDATE TO ADMIN
@@ -287,44 +291,45 @@ async function run() {
       }
     });
 
-    // ========================payment related=========================
+    // ===============================================================payment related================================================//
 
     app.post("/create-checkout-session", async (req, res) => {
       try {
         const paymentInfo = req.body;
         console.log("Payment Info:", paymentInfo);
 
-      const session = await stripe.checkout.sessions.create({
-  // payment_method_types: ["card"],
+        const session = await stripe.checkout.sessions.create({
+          // payment_method_types: ["card"],
 
-  customer_email: paymentInfo?.buyer?.buyerEmail,
+          customer_email: paymentInfo?.buyer?.buyerEmail,
 
-  line_items: [
-    {
-      price_data: {
-        currency: "usd",
-        product_data: {
-          name: paymentInfo?.title,
-          images: [paymentInfo?.image],
-        },
-        unit_amount: paymentInfo?.price * 100,
-      },
-      quantity: paymentInfo?.quantity,
-    },
-  ],
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: paymentInfo?.title,
+                  images: [paymentInfo?.image],
+                },
+                unit_amount: paymentInfo?.price * 100,
+              },
+              quantity: paymentInfo?.quantity,
+            },
+          ],
 
-  mode: "payment",
+          mode: "payment",
 
-  metadata: {
-    ticketId: paymentInfo?.ticketId,
-    buyerEmail: paymentInfo?.buyer?.buyerEmail,
-    buyerImage: paymentInfo?.buyer?.buyerPhoto,
-  },
+          metadata: {
+            ticketId: paymentInfo?.ticketId,
+            bookingId: paymentInfo?.bookingId,
+            ticketTitle: paymentInfo?.title,
+            buyerEmail: paymentInfo?.buyer?.buyerEmail,
+            buyerImage: paymentInfo?.buyer?.buyerPhoto,
+          },
 
-  success_url: `${process.env.CLIENT_LOCALHOST_DOMAINE}/paymentSuccess?session_id={CHECKOUT_SESSION_ID}`,
-  cancel_url: `${process.env.CLIENT_LOCALHOST_DOMAINE}/dashboard/myBookingTickets`,
-});
-
+          success_url: `${process.env.CLIENT_LOCALHOST_DOMAINE}/paymentSuccess?session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${process.env.CLIENT_LOCALHOST_DOMAINE}/dashboard/myBookingTickets`,
+        });
 
         res.send({ url: session.url });
       } catch (error) {
@@ -333,12 +338,81 @@ async function run() {
       }
     });
 
+    app.post("/payment-success", async (req, res) => {
+      const { bookingId: sessionId } = req.body;
 
+      try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
 
+        const mongoBookingId = session.metadata.bookingId;
+        const ticketId = session.metadata.ticketId;
+        const paymentIntentId = session.payment_intent;
 
+        if (session.status !== "complete") {
+          return res
+            .status(400)
+            .send({ message: "Payment session not complete" });
+        }
+        res.send(ticketId, paymentIntentId);
 
+        const existingTransaction = await transactionCollection.findOne({
+          transactionId: paymentIntentId,
+        });
 
+        if (!existingTransaction) {
+          const bookingToUpdate = await ticketsBookingCollection.findOne({
+            _id: new ObjectId(mongoBookingId),
+          });
 
+          if (!bookingToUpdate) {
+            console.error("Booking document not found for ID:", mongoBookingId);
+            return res
+              .status(404)
+              .send({ message: "Corresponding booking not found." });
+          }
+
+          const transactionData = {
+            transactionId: paymentIntentId,
+            amount: session.amount_total / 100,
+            ticketTitle: session.metadata.ticketTitle,
+            ticketId: ticketId,
+            buyerEmail: session.metadata.buyerEmail,
+            paymentDate: new Date(),
+            mongoBookingId: mongoBookingId,
+          };
+          await transactionCollection.insertOne(transactionData);
+
+          await ticketsCollection.updateOne(
+            { _id: new ObjectId(ticketId) },
+            {
+              $inc: { quantity: -bookingToUpdate.quantity },
+            }
+          );
+
+          await ticketsBookingCollection.updateOne(
+            { _id: new ObjectId(mongoBookingId) },
+            {
+              $set: {
+                status: "paid",
+                transactionId: paymentIntentId,
+              },
+            }
+          );
+
+          return res.send({
+            success: true,
+            message: "Payment processed successfully.",
+          });
+        }
+
+        res.send({ success: true, message: "Payment already processed." });
+      } catch (error) {
+        console.error("Error in /payment-success:", error);
+        res
+          .status(500)
+          .send({ error: error.message, message: "Server error." });
+      }
+    });
     // GET All Tickets Added by a Vendor
     app.get("/vendor-tickets", async (req, res) => {
       const email = req.query.email;
