@@ -118,35 +118,32 @@ app.get("/transactions", async (req, res) => {
     // ROLE UPDATE TO ADMIN
 
     // get all tickets for admin
-    app.get("/ticketsAdmin", async (req, res) => {
-      const cursor = ticketsCollection.find().sort({ _id: -1 });
-      const approvedTickets = await cursor.toArray();
-      res.send(approvedTickets);
-    });
+ app.get("/ticketsAdmin", async (req, res) => {
+  const result = await ticketsCollection.find().toArray();
+  res.send(result);
+});
 
-    // delete vendor ticket
-    app.delete("/ticketsAdmin/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const result = await ticketsCollection.deleteOne(filter);
-      res.send(result);
-    });
+ 
+   // delete vendor ticket
+app.delete("/ticketsAdmin/:id", async (req, res) => {
+  const id = req.params.id;
+  const filter = { _id: new ObjectId(id) };
+  const result = await ticketsCollection.deleteOne(filter);
+  res.send(result);
+});
 
     // approve ticket
-    app.patch("/approve/:id", async (req, res) => {
-      const id = req.params.id;
+   app.patch("/approve/:id", async (req, res) => {
+  const id = req.params.id;
 
-      const updateDoc = {
-        $set: {
-          status: "approved",
-        },
-      };
+  const filter = { _id: new ObjectId(id) };
+  const updateDoc = {
+    $set: { status: "approved" },
+  };
 
-      const filter = { _id: new ObjectId(id) };
-      const result = await ticketsCollection.updateOne(filter, updateDoc);
-
-      res.send(result);
-    });
+  const result = await ticketsCollection.updateOne(filter, updateDoc);
+  res.send(result);
+});
 
     //  reject ticket
     app.patch("/reject/:id", async (req, res) => {
@@ -154,7 +151,7 @@ app.get("/transactions", async (req, res) => {
 
       const updateDoc = {
         $set: {
-          status: "reject",
+          status: "rejected",
         },
       };
 
