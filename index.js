@@ -321,6 +321,36 @@ app.delete("/ticketsAdmin/:id", async (req, res) => {
       }
     });
 
+    app.get("/vendor-overview/:email", async (req, res) => {
+  const email = req.params.email;
+
+  // 1️⃣ Total Tickets Added (vendor added tickets)
+  const totalTicketsAdded = await ticketsCollection.countDocuments({
+    "Vendor.VendorEmail": email,
+  });
+
+  // 2️⃣ Sold Tickets (paid bookings)
+  const soldBookings = await ticketsBookingCollection.find({
+    "vendor.VendorEmail": email,
+    status: "paid",
+  }).toArray();
+
+  const totalTicketsSold = soldBookings.length;
+
+  // 3️⃣ Total Revenue
+  const totalRevenue = soldBookings.reduce(
+    (sum, booking) => sum + booking.totalPrice,
+    0
+  );
+
+  res.send({
+    totalTicketsAdded,
+    totalTicketsSold,
+    totalRevenue,
+  });
+});
+
+
     // ===============================================================payment related================================================//
 
     app.post("/create-checkout-session", async (req, res) => {
