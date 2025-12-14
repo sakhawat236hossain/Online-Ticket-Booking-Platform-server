@@ -53,6 +53,14 @@ async function run() {
     const ticketsBookingCollection = db.collection("ticketsBooking");
     const usersCollection = db.collection("users");
     const transactionCollection = db.collection("transactionData");
+    const feedbackCollection = db.collection("feedback");
+
+app.post("/feedback", async (req, res) => {
+  const feedback = req.body;
+  const result = await feedbackCollection.insertOne(feedback);
+  res.status(201).send(result);
+});
+
 
     // ====================USERS APIS=========================
     // POST User
