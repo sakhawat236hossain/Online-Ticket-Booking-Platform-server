@@ -64,7 +64,7 @@ app.post("/feedback", async (req, res) => {
 
     // ====================USERS APIS=========================
     // POST User
-    app.post("/users", async (req, res) => {
+    app.post("/users",verifyFBToken, async (req, res) => {
       const userData = req.body;
       userData.role = "user";
       userData.createdAt = new Date();
@@ -80,7 +80,7 @@ app.post("/feedback", async (req, res) => {
     });
 
     // GET All Users
-    app.get("/users", async (req, res) => {
+    app.get("/users",verifyFBToken, async (req, res) => {
       const cursor = usersCollection.find();
       const users = await cursor.toArray();
       res.send(users);
@@ -94,7 +94,7 @@ app.post("/feedback", async (req, res) => {
     })
 
    // get all transactions by buyer email
-app.get("/transactions", async (req, res) => {
+app.get("/transactions",verifyFBToken, async (req, res) => {
   try {
     const email = req.query.email;
 
@@ -220,7 +220,7 @@ app.delete("/ticketsAdmin/:id", async (req, res) => {
             advertised: true,
           });
 
-          if (advertisedCount >= 6) {
+          if (advertisedCount >= 7) {
             return res.status(400).send({
               message: "Maximum 6 tickets can be advertised at a time",
             });
@@ -251,7 +251,7 @@ app.delete("/ticketsAdmin/:id", async (req, res) => {
 
     // ====================TICKETS APIS=========================
     //  POST Ticket
-    app.post("/tickets", async (req, res) => {
+    app.post("/tickets",verifyFBToken, async (req, res) => {
       console.log("headers in the post", req.headers);
       const ticketData = req.body;
       const result = await ticketsCollection.insertOne(ticketData);
@@ -283,7 +283,7 @@ app.delete("/ticketsAdmin/:id", async (req, res) => {
     });
 
     // get Single Ticket by ID
-    app.get("/tickets/:id", async (req, res) => {
+    app.get("/tickets/:id",verifyFBToken, async (req, res) => {
       const id = req.params.id;
       const { ObjectId } = require("mongodb");
 
@@ -305,7 +305,7 @@ app.delete("/ticketsAdmin/:id", async (req, res) => {
     // ====================TICKETS APIS VENDOR=========================
 
     // POST Ticket Booking
-    app.post("/tickets-booking", async (req, res) => {
+    app.post("/tickets-booking",verifyFBToken, async (req, res) => {
       try {
         const bookingData = req.body;
         const bookingResult = await ticketsBookingCollection.insertOne(
@@ -321,15 +321,17 @@ app.delete("/ticketsAdmin/:id", async (req, res) => {
       }
     });
 
+    // VendorRevenue api
+
     app.get("/vendor-overview/:email", async (req, res) => {
   const email = req.params.email;
 
-  // 1️⃣ Total Tickets Added (vendor added tickets)
+  //  Total Tickets Added (vendor added tickets)
   const totalTicketsAdded = await ticketsCollection.countDocuments({
     "Vendor.VendorEmail": email,
   });
 
-  // 2️⃣ Sold Tickets (paid bookings)
+  //  Sold Tickets (paid bookings)
   const soldBookings = await ticketsBookingCollection.find({
     "vendor.VendorEmail": email,
     status: "paid",
@@ -337,7 +339,7 @@ app.delete("/ticketsAdmin/:id", async (req, res) => {
 
   const totalTicketsSold = soldBookings.length;
 
-  // 3️⃣ Total Revenue
+  //  Total Revenue
   const totalRevenue = soldBookings.reduce(
     (sum, booking) => sum + booking.totalPrice,
     0
