@@ -6,7 +6,6 @@ require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const app = express();
 const port = process.env.PORT || 8000;
-const admin = require("firebase-admin");
 
 // middleware
 app.use(express.json());
@@ -14,19 +13,16 @@ app.use(cors());
 
 const serviceAccount = require("./online-ticket-booking-platform-firebase-adminsdk.json");
 
-// Initialize Firebase Admin SDK
-// যদি admin SDK initialize করা না থাকে
-if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-    });
-}
-
+const admin = require('firebase-admin')
+admin.initializeApp({
+  credential:admin.credential.cert(serviceAccount)
+})
 
 // firebase token
 const verifyFBToken = async (req, res, next) => {
     const token = req.headers.authorization;
-    console.log(token);
+    console.log(token,req.headers);
+    // console.log(token);
 
     if (!token) {
         return res.status(401).send({ message: "unauthorized access" });
@@ -39,6 +35,7 @@ const verifyFBToken = async (req, res, next) => {
         req.decoded_email = decoded.email;
         next();
     } catch (error) {
+      console.log(error);
         return res.status(401).send({ message: "unauthorized access" });
     }
 };
@@ -56,13 +53,16 @@ const client = new MongoClient(uri, {
 
 async function run() {
     try {
-        await client.connect();
+        // await client.connect();
         const db = client.db("Online_Ticket_Booking_Platform-DB");
         const ticketsCollection = db.collection("tickets");
         const ticketsBookingCollection = db.collection("ticketsBooking");
         const usersCollection = db.collection("users");
         const transactionCollection = db.collection("transactionData");
         const feedbackCollection = db.collection("feedback");
+
+
+        //======================================feedback================================
 
         // post 
         app.post("/feedback", async (req, res) => {
@@ -97,21 +97,21 @@ async function run() {
         });
 
         // GET All Users
-        app.get("/users", async (req, res) => {
+        app.get("/users",verifyFBToken, async (req, res) => {
             const cursor = usersCollection.find();
             const users = await cursor.toArray();
             res.send(users);
         });
 
         // get a user's role
-        app.get("/user/role/:email", async (req, res) => {
+        app.get("/user/role/:email",verifyFBToken, async (req, res) => {
             const email = req.params.email
             const result = await usersCollection.findOne({ email })
             res.send({ role: result?.role })
         })
 
         // get all transactions by buyer email
-        app.get("/transactions", async (req, res) => {
+        app.get("/transactions",verifyFBToken, async (req, res) => {
             try {
                 const email = req.query.email;
 
@@ -135,8 +135,7 @@ async function run() {
         // ROLE UPDATE TO ADMIN
 
         // get all tickets for admin
-        app.get("/ticketsAdmin", async (req, res) => {
-            // Admin এই API-তে সমস্ত টিকিট দেখতে পাবেন, এমনকি Fraud টিকিটও, তাই এখানে ফ্রড ফিল্টার যোগ করা হয়নি।
+        app.get("/ticketsAdmin",async (req, res) => {
             const result = await ticketsCollection.find().sort({ departure: -1 }).toArray();
             res.send(result);
         });
@@ -156,7 +155,7 @@ async function run() {
 
             const filter = { _id: new ObjectId(id) };
             const updateDoc = {
-                $set: { status: "approved", isHiddenByAdmin: false }, // নিশ্চিত করা হলো যে এপ্রুভ হলে যেন হাইড না থাকে
+                $set: { status: "approved", isHiddenByAdmin: false },
             };
 
             const result = await ticketsCollection.updateOne(filter, updateDoc);
@@ -170,7 +169,6 @@ async function run() {
             const updateDoc = {
                 $set: {
                     status: "rejected",
-                    // Rejected হলে ফ্রড না হলেও সেটা হাইড থাকবে
                     isHiddenByAdmin: true, 
                 },
             };
@@ -239,7 +237,6 @@ async function run() {
             // 3. Hide ALL tickets added by this vendor from the platform
             const ticketUpdateDoc = {
                 $set: {
-                    // এই ফ্ল্যাগ ব্যবহার করে ফ্রড টিকিটগুলি পাবলিক API থেকে হাইড করা হবে
                     isHiddenByAdmin: true, 
                     status: "rejected" 
                 },
@@ -264,7 +261,6 @@ async function run() {
 
             try {
                 if (advertised) {
-                    // advertised টিকিট ফ্রড কিনা চেক করার জন্য একটি অতিরিক্ত Query যুক্ত করা হলো
                     const ticket = await ticketsCollection.findOne({ _id: new ObjectId(id) });
                     if (ticket && ticket.isHiddenByAdmin === true) {
                         return res.status(400).send({
@@ -297,10 +293,9 @@ async function run() {
 
         //  get only advertisement tickets (Exactly 6)
         app.get("/ticketsAdvertised", async (req, res) => {
-            // **ফ্রড লজিক যুক্ত করা হলো**
             const query = { 
                 advertised: true,
-                status: "approved", // বিজ্ঞাপনের জন্য অবশ্যই এপ্রুভড হতে হবে
+                status: "approved", 
                 $or: [
                     { isHiddenByAdmin: { $exists: false } },
                     { isHiddenByAdmin: false }
@@ -319,11 +314,10 @@ async function run() {
         //  POST Ticket
         app.post("/tickets", async (req, res) => {
             const ticketData = req.body;
-            // ভেন্ডর নতুন টিকিট পোস্ট করলে ডিফল্ট status ও isHiddenByAdmin সেট করা হলো
             const newTicket = {
                 ...ticketData,
                 status: "pending", 
-                isHiddenByAdmin: false, // প্রথমে হাইড থাকবে না
+                isHiddenByAdmin: false, 
             };
             const result = await ticketsCollection.insertOne(newTicket);
             res.send(result);
@@ -331,7 +325,6 @@ async function run() {
 
         // latest tickets
         app.get("/latest-tickets", async (req, res) => {
-            // **ফ্রড লজিক যুক্ত করা হলো**
             const query = { 
                 status: "approved",
                 $or: [
@@ -346,11 +339,9 @@ async function run() {
 
         // get Only Approved Tickets All
         app.get("/approved-tickets", async (req, res) => {
-            // **ফ্রড লজিক যুক্ত করা হলো**
             const query = { 
                 status: "approved",
                 $or: [
-                    // isHiddenByAdmin ফিল্ডটি না থাকলে (পুরোনো ডেটা) অথবা false হলে ডেটা দেখাও
                     { isHiddenByAdmin: { $exists: false } }, 
                     { isHiddenByAdmin: false }
                 ]
@@ -363,7 +354,6 @@ async function run() {
         // get Single Ticket by ID
         app.get("/tickets/:id", async (req, res) => {
             const id = req.params.id;
-            // সিঙ্গেল টিকিট লোডের সময়ও ফ্রড টিকিট হাইড করার জন্য লজিক যুক্ত হলো
             try {
                 const query = { 
                     _id: new ObjectId(id),
@@ -406,7 +396,7 @@ async function run() {
 
         // VendorRevenue api
 
-        app.get("/vendor-overview/:email", async (req, res) => {
+        app.get("/vendor-overview/:email",verifyFBToken, async (req, res) => {
             const email = req.params.email;
 
             //  Total Tickets Added (vendor added tickets)
@@ -560,8 +550,8 @@ async function run() {
             }
         });
         
-        // GET All Tickets Added by a Vendor (No Change)
-        app.get("/vendor-tickets", async (req, res) => {
+        // GET All Tickets Added by a Vendor 
+        app.get("/vendor-tickets",verifyFBToken, async (req, res) => {
             const email = req.query.email;
 
             if (!email) {
@@ -574,12 +564,11 @@ async function run() {
             res.send(result);
         });
 
-        // update vendor ticket (No Change)
-        app.patch("/tickets/:id", async (req, res) => {
+        // update vendor ticket 
+        app.patch("/tickets/:id",verifyFBToken, async (req, res) => {
             const id = req.params.id;
             const updatedData = req.body;
             
-            // যখন ভেন্ডর টিকিট আপডেট করবে, তখন status আবার pending করে দেওয়া হবে
             const updateDoc = {
                 $set: {
                     ...updatedData,
@@ -619,7 +608,7 @@ async function run() {
         });
 
         // GET requested tickets for a vendor (No Change)
-        app.get("/requested-tickets", async (req, res) => {
+        app.get("/requested-tickets",verifyFBToken, async (req, res) => {
             try {
                 const email = req.query.email;
                 if (!email) {
@@ -638,7 +627,7 @@ async function run() {
         });
 
         // rejected api for vendor (No Change)
-        app.patch("/reject-booking/:id", async (req, res) => {
+        app.patch("/reject-booking/:id",verifyFBToken, async (req, res) => {
             const id = req.params.id;
 
             const updateDoc = {
@@ -657,7 +646,7 @@ async function run() {
         });
 
         // accepted api for vendor (No Change)
-        app.patch("/accept-booking/:id", async (req, res) => {
+        app.patch("/accept-booking/:id",verifyFBToken, async (req, res) => {
             const id = req.params.id;
 
             const updateDoc = {
@@ -677,7 +666,7 @@ async function run() {
 
         // =================== USER BOOKING APIS ========================
         // GET All Bookings email by a User (No Change)
-        app.get("/user-tickets", async (req, res) => {
+        app.get("/user-tickets",verifyFBToken, async (req, res) => {
             const email = req.query.email;
             if (!email) {
                 return res.status(400).send({ message: "Email is required" });
@@ -687,7 +676,7 @@ async function run() {
             res.send(result);
         });
 
-        await client.db("admin").command({ ping: 1 });
+        // await client.db("admin").command({ ping: 1 });
         console.log(
             "Pinged your deployment. You successfully connected to MongoDB!"
         );
