@@ -11,7 +11,11 @@ const port = process.env.PORT || 8000;
 app.use(express.json());
 app.use(cors());
 
-const serviceAccount = require("./online-ticket-booking-platform-firebase-adminsdk.json");
+// const serviceAccount = require("./online-ticket-booking-platform-firebase-adminsdk.json");
+// const serviceAccount = require("./firebase-admin-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
 
 const admin = require('firebase-admin')
 admin.initializeApp({
@@ -60,7 +64,47 @@ async function run() {
         const usersCollection = db.collection("users");
         const transactionCollection = db.collection("transactionData");
         const feedbackCollection = db.collection("feedback");
+        const contactCollection = db.collection("contactMessages");
 
+
+
+        // ====================CONTACT MESSAGE APIS=========================
+app.post('/contact', async (req, res) => {
+  try {
+    const contactData = req.body;
+    const result = await contactCollection.insertOne({
+      ...contactData,
+      submittedAt: new Date()
+    });
+    res.send(result);
+  } catch (error) {
+    res.status(500).send("Server Error");
+  }
+});
+
+app.get('/contact', async (req, res) => {
+  const result = await contactCollection.find().sort({ submittedAt: -1 }).toArray();
+  res.send(result);
+});
+
+
+
+// delete contact message
+
+app.delete('/contact/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+            return res.status(400).send({ message: "Invalid ID format" });
+        }
+        const query = { _id: new ObjectId(id) };
+        const result = await contactCollection.deleteOne(query);
+        res.send(result); 
+    } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Internal Server Error" });
+    }
+});
 
         //======================================feedback================================
 
@@ -72,12 +116,16 @@ async function run() {
         });
 
         // get 
-        app.get("/feedback",async (req,res)=>{
-          const cursor =feedbackCollection.find()
-          const feedback =await cursor.toArray()
-          res.send(feedback)
-        })
-
+     app.get("/feedback", async (req, res) => {
+    try {
+        const cursor = feedbackCollection.find();
+        const feedback = await cursor.toArray();
+        console.log("Fetched Feedback from DB:", feedback); 
+        res.send(feedback);
+    } catch (error) {
+        res.status(500).send({ message: "Error fetching data" });
+    }
+});
 
         // ====================USERS APIS=========================
         // POST User
