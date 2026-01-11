@@ -116,14 +116,35 @@ app.delete('/contact/:id', async (req, res) => {
         });
 
         // get 
-     app.get("/feedback", async (req, res) => {
+    app.get("/feedback", async (req, res) => {
     try {
-        const cursor = feedbackCollection.find();
-        const feedback = await cursor.toArray();
-        console.log("Fetched Feedback from DB:", feedback); 
+        const feedback = await feedbackCollection
+            .find()
+            .sort({ createdAt: -1 }) 
+            .toArray();
+
+        console.log("Latest Feedback Fetched"); 
         res.send(feedback);
     } catch (error) {
+        console.error("Error fetching feedback:", error);
         res.status(500).send({ message: "Error fetching data" });
+    }
+});
+// delete feedback
+
+app.delete("/feedback/:id", async (req, res) => {
+    try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await feedbackCollection.deleteOne(query);
+        
+        if (result.deletedCount > 0) {
+            res.send({ success: true, message: "Feedback deleted successfully" });
+        } else {
+            res.status(404).send({ success: false, message: "Feedback not found" });
+        }
+    } catch (error) {
+        res.status(500).send({ message: "Error deleting feedback" });
     }
 });
 
@@ -522,82 +543,72 @@ app.delete('/contact/:id', async (req, res) => {
         });
 
         // Payment Success (No Change)
-        app.post("/payment-success", async (req, res) => {
-            const { bookingId: sessionId } = req.body;
+   app.post("/payment-success", async (req, res) => {
+    const { bookingId: sessionId } = req.body;
 
-            try {
-                const session = await stripe.checkout.sessions.retrieve(sessionId);
+    try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-                const mongoBookingId = session.metadata.bookingId;
-                const ticketId = session.metadata.ticketId;
-                const paymentIntentId = session.payment_intent;
+        const mongoBookingId = session.metadata.bookingId;
+        const ticketId = session.metadata.ticketId;
+        const paymentIntentId = session.payment_intent;
 
-                if (session.status !== "complete") {
-                    return res
-                        .status(400)
-                        .send({ message: "Payment session not complete" });
-                }
-                res.send(ticketId, paymentIntentId);
+        if (session.status !== "complete") {
+            return res.status(400).send({ message: "Payment session not complete" });
+        }
 
-                const existingTransaction = await transactionCollection.findOne({
-                    transactionId: paymentIntentId,
-                });
 
-                if (!existingTransaction) {
-                    const bookingToUpdate = await ticketsBookingCollection.findOne({
-                        _id: new ObjectId(mongoBookingId),
-                    });
+        let transactionData; 
 
-                    if (!bookingToUpdate) {
-                        console.error("Booking document not found for ID:", mongoBookingId);
-                        return res
-                            .status(404)
-                            .send({ message: "Corresponding booking not found." });
-                    }
-
-                    const transactionData = {
-                        transactionId: paymentIntentId,
-                        amount: session.amount_total / 100,
-                        ticketTitle: session.metadata.ticketTitle,
-                        ticketId: ticketId,
-                        buyerEmail: session.metadata.buyerEmail,
-                        paymentDate: new Date(),
-                        mongoBookingId: mongoBookingId,
-                    };
-                    await transactionCollection.insertOne(transactionData);
-
-                    await ticketsCollection.updateOne(
-                        { _id: new ObjectId(ticketId) },
-                        {
-                            $inc: { quantity: -bookingToUpdate.quantity },
-                        }
-                    );
-
-                    await ticketsBookingCollection.updateOne(
-                        { _id: new ObjectId(mongoBookingId) },
-                        {
-                            $set: {
-                                status: "paid",
-                                transactionId: paymentIntentId,
-                            },
-                        }
-                    );
-
-                    return res.send({
-                        success: true,
-                        message: "Payment processed successfully.",
-                    });
-                }
-
-                res.send({ success: true, message: "Payment already processed." });
-            } catch (error) {
-                console.error("Error in /payment-success:", error);
-                res
-                    .status(500)
-                    .send({ error: error.message, message: "Server error." });
-            }
+        const existingTransaction = await transactionCollection.findOne({
+            transactionId: paymentIntentId,
         });
-        
+
+        if (!existingTransaction) {
+            const bookingToUpdate = await ticketsBookingCollection.findOne({
+                _id: new ObjectId(mongoBookingId),
+            });
+
+            if (!bookingToUpdate) {
+                return res.status(404).send({ message: "Corresponding booking not found." });
+            }
+
+            transactionData = {
+                transactionId: paymentIntentId,
+                amount: session.amount_total, // Stripe সেন্টস এ ডাটা দেয় (PDF এর জন্য ভালো)
+                ticketTitle: session.metadata.ticketTitle,
+                ticketId: ticketId,
+                buyerEmail: session.metadata.buyerEmail,
+                paymentDate: new Date(),
+                mongoBookingId: mongoBookingId,
+            };
+
+            await transactionCollection.insertOne(transactionData);
+
+            await ticketsCollection.updateOne(
+                { _id: new ObjectId(ticketId) },
+                { $inc: { quantity: -bookingToUpdate.quantity } }
+            );
+
+            await ticketsBookingCollection.updateOne(
+                { _id: new ObjectId(mongoBookingId) },
+                { $set: { status: "paid", transactionId: paymentIntentId } }
+            );
+        } else {
+            transactionData = existingTransaction; // যদি আগে থেকেই থাকে
+        }
+
+        // ডাটাটি অবশ্যই পাঠাতে হবে যেন ফ্রন্টএন্ড বাটনটি এনাবল হয়
+        return res.send({
+            success: true,
+            data: transactionData 
+        });
+
+    } catch (error) {
+        console.error("Error in /payment-success:", error);
+        res.status(500).send({ error: error.message, message: "Server error." });
+    }
+});
         // GET All Tickets Added by a Vendor 
         app.get("/vendor-tickets",verifyFBToken, async (req, res) => {
             const email = req.query.email;
