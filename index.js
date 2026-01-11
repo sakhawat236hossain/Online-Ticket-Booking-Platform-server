@@ -72,14 +72,12 @@ async function run() {
 
 // ====================REVIEWS APIS=========================
 
-    // একটি নির্দিষ্ট টিকেটের সব রিভিউ পাওয়ার এপিআই
 app.get('/reviews/:ticketId', async (req, res) => {
     const ticketId = req.params.ticketId;
     const reviews = await reviewCollection.find({ ticketId, status: 'approved' }).toArray();
     res.send(reviews);
 });
 
-// নতুন রিভিউ পোস্ট করার এপিআই
 app.post('/reviews', async (req, res) => {
     const review = req.body;
     const result = await reviewCollection.insertOne(review);
