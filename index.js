@@ -67,6 +67,36 @@ async function run() {
     const transactionCollection = db.collection("transactionData");
     const feedbackCollection = db.collection("feedback");
     const contactCollection = db.collection("contactMessages");
+    const reviewCollection = db.collection("reviews");
+
+
+// ====================REVIEWS APIS=========================
+
+    // একটি নির্দিষ্ট টিকেটের সব রিভিউ পাওয়ার এপিআই
+app.get('/reviews/:ticketId', async (req, res) => {
+    const ticketId = req.params.ticketId;
+    const reviews = await reviewCollection.find({ ticketId, status: 'approved' }).toArray();
+    res.send(reviews);
+});
+
+// নতুন রিভিউ পোস্ট করার এপিআই
+app.post('/reviews', async (req, res) => {
+    const review = req.body;
+    const result = await reviewCollection.insertOne(review);
+    res.send(result);
+});
+
+// get all reviews (admin)
+app.get('/all-reviews', async (req, res) => {
+    const reviews = await reviewCollection.find().toArray();
+    res.send(reviews);
+});
+// delete review (admin)
+app.delete('/reviews/:id', async (req, res) => {
+    const id = req.params.id;
+    const result = await reviewCollection.deleteOne({ _id: new ObjectId(id) });
+    res.send(result);
+});
 
     // ====================CONTACT MESSAGE APIS=========================
     app.post("/contact", async (req, res) => {
@@ -209,26 +239,21 @@ app.get("/user-overview/:email", verifyFBToken, async (req, res) => {
     try {
         const email = req.params.email;
 
-        // ১. মোট বুকিং সংখ্যা (সব স্ট্যাটাস মিলে)
         const totalBookings = await ticketsBookingCollection.countDocuments({ "buyer.buyerEmail": email });
 
-        // ২. পেইড বুকিং (সাকসেসফুল পেমেন্ট)
         const paidBookingsCount = await ticketsBookingCollection.countDocuments({ 
             "buyer.buyerEmail": email, 
             status: "paid" 
         });
 
-        // ৩. পেন্ডিং বা অন্য স্ট্যাটাস বুকিং
         const pendingBookingsCount = await ticketsBookingCollection.countDocuments({ 
             "buyer.buyerEmail": email, 
             status: "pending" 
         });
 
-        // ৪. মোট কত খরচ করেছে (Transaction কালেকশন থেকে)
         const transactions = await transactionCollection.find({ buyerEmail: email }).toArray();
         const totalSpent = transactions.reduce((sum, trx) => sum + (trx.amount / 100), 0);
 
-        // ৫. ফিডব্যাক কয়টি দিয়েছে
         const myFeedbacks = await feedbackCollection.countDocuments({ email: email });
 
         res.send({
