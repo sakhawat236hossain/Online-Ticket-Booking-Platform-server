@@ -136,6 +136,23 @@ app.delete('/reviews/:id', async (req, res) => {
       }
     });
 
+
+
+    // app.delete("/contact/:id", async (req, res) => {
+    //   try {
+    //     const id = req.params.id;
+    //     if (!ObjectId.isValid(id)) {
+    //       return res.status(400).send({ message: "Invalid ID format" });
+    //     }
+    //     const query = { _id: new ObjectId(id) };
+    //     const result = await contactCollection.deleteOne(query);
+    //     res.send(result);
+    //   } catch (error) {
+    //     console.error(error);
+    //     res.status(500).send({ message: "Internal Server Error" });
+    //   }
+    // });
+
     //======================================feedback================================
 
     // post
