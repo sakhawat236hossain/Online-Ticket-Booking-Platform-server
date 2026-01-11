@@ -379,6 +379,39 @@ app.delete("/feedback/:id", async (req, res) => {
             res.send(result);
         });
 
+        // ==================== ADMIN OVERVIEW API =========================
+app.get("/admin-overview", verifyFBToken, async (req, res) => {
+    try {
+        const totalUsers = await usersCollection.countDocuments();
+
+        const totalTickets = await ticketsCollection.countDocuments();
+
+        // ৩. মোট বুকিং (Tickets Sold)
+        const totalBookings = await ticketsBookingCollection.countDocuments({ status: "paid" });
+
+        const totalFeedback = await feedbackCollection.countDocuments();
+
+        const transactions = await transactionCollection.find().toArray();
+        const totalRevenue = transactions.reduce((sum, transaction) => sum + (transaction.amount / 100), 0); 
+
+        const totalVendors = await usersCollection.countDocuments({ role: "vendor" });
+        const pendingTickets = await ticketsCollection.countDocuments({ status: "pending" });
+
+        res.send({
+            totalUsers,
+            totalTickets,
+            totalBookings,
+            totalRevenue,
+            totalFeedback,
+            totalVendors,
+            pendingTickets
+        });
+    } catch (error) {
+        console.error("Admin Overview Error:", error);
+        res.status(500).send({ message: "Internal Server Error" });
+    }
+});
+
         // ====================TICKETS APIS=========================
         //  POST Ticket
         app.post("/tickets", async (req, res) => {
